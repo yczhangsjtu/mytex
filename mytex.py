@@ -76,7 +76,28 @@ class Mytex:
         for filename in os.listdir(template_path):
             source_path = os.path.join(template_path, filename)
             destination_path = os.path.join(project_dir, filename)
+            self._render_template(source_path, os.path.join(project_dir, filename), self.config)
             shutil.copy(source_path, destination_path)
+    
+    @staticmethod
+    def _render_template_with_config(template_string, config):
+        """
+        Find every substring of format <xxx>, and replace it with `config[xxx]`
+        :param template_string: input template string containing tags like <xxx>
+        :param config: a dictionary containing the tags and their values. The tags should be in the format <xxx>
+        :type config: dict[str, str]
+        :return: the template string with all tags replaced with their values.
+        :rtype: str
+        """
+        for key in config:
+            template_string = template_string.replace(f"<{key}>", config[key])
+        return template_string
+    
+    def _render_template(self, template_path, destination_path, context):
+        with open(template_path, "r") as f:
+            template = f.read()
+        with open(destination_path, "w") as f:
+            f.write(Mytex._render_template_with_config(template, context))
 
     def _update_config(self, project_dir, project_name, template_name):
         config = self._read_config(os.path.join(project_dir, ".mytex", "config.yaml"))
