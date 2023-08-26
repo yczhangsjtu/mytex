@@ -5,6 +5,8 @@ import yaml
 import logging
 import shutil
 import sys
+from author import Author, AuthorManager
+from keywords import Keywords
 
 
 class Mytex:
@@ -70,6 +72,38 @@ class Mytex:
         config = self._read_config(os.path.join(project_dir, ".mytex", "config.yaml"))
         template_name = config["template"]
         self._copy_template(project_dir, template_name)
+    
+    def _template_config(self, template_name):
+        config = {
+            "meta": "",
+            "author": "",
+            "title": "",
+            "date": "",
+            "keywords": "",
+        }
+        if self.config.haskey("authors"):
+            assert isinstance(self.config["authors"], list)
+            authors = AuthorManager()
+            for author_config in self.config["authors"]:
+                author = Author(author_config["name"], author_config["email"])
+                if "institutes" in author_config:
+                    for institute in author_config["institutes"]:
+                        author.add_institute(institute)
+                authors.add_author(author)
+            config["author"] = authors.dump(template_name)
+        if self.config.haskey("title"):
+            config["title"] = self.config["title"]
+        if self.config.haskey("date"):
+            config["date"] = self.config["date"]
+        if self.config.haskey("keywords"):
+            assert isinstance(self.config["keywords"], list)
+            keywords = Keywords()
+            for keyword in self.config["keywords"]:
+                keywords.add_keyword(keyword)
+            config["keywords"] = keywords.dump()
+        if self.config.haskey("meta"):
+            config["meta"] = self.config["meta"]
+        return config
 
     def _copy_template(self, project_dir, template_name):
         template_path = self.templates[template_name]
@@ -112,11 +146,11 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 1:
         # No command is given, so print help message
-        print("Usage: mytex <command> [options]")
-        print("Available commands:")
-        print("  create   Create a new project")
-        print("  template Switch the template of an existing project")
-        print("  help     Print this help message")
+        logging.log("Usage: mytex <command> [options]")
+        logging.log("Available commands:")
+        logging.log("  create   Create a new project")
+        logging.log("  template Switch the template of an existing project")
+        logging.log("  help     Print this help message")
 
     elif sys.argv[1] == "create":
         # Create a new project
@@ -128,5 +162,5 @@ if __name__ == "__main__":
 
     else:
         # Invalid command
-        print("Invalid command: {}".format(sys.argv[1]))
-        print("Use `mytex help` to see a list of available commands.")
+        logging.log("Invalid command: {}".format(sys.argv[1]))
+        logging.log("Use `mytex help` to see a list of available commands.")
