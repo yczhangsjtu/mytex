@@ -56,14 +56,23 @@ class Mytex:
 
         if template_name not in self.templates:
             raise ValueError("Invalid template name: {}".format(template_name))
+        
+        # Ask the user for title
+        title = input("Title: ")
+        # Ask the user for date
+        date = input("Date (YYYY-MM-DD): ")
 
         project_dir = os.path.join(os.getcwd(), project_name)
         if os.path.exists(project_dir):
             raise ValueError("Project already exists: {}".format(project_dir))
 
         os.makedirs(project_dir)
+        self._update_config(project_dir,
+                            project_name=project_name,
+                            title=title,
+                            date=date,
+                            template_name=template_name)
         self._copy_template(project_dir, template_name)
-        self._update_config(project_dir, project_name, template_name)
 
     def template(self, project_dir):
         if not os.path.exists(project_dir):
@@ -73,7 +82,7 @@ class Mytex:
         template_name = config["template"]
         self._copy_template(project_dir, template_name)
     
-    def _template_config(self, template_name):
+    def _template_config(self, template_name, project_dir):
         config = {
             "meta": "",
             "author": "",
@@ -81,28 +90,29 @@ class Mytex:
             "date": "",
             "keywords": "",
         }
-        if self.config.haskey("authors"):
-            assert isinstance(self.config["authors"], list)
+        project_config = self._read_config(os.path.join(project_dir, ".mytex", "config.yaml"))
+        if "authors" in project_config:
+            assert isinstance(project_config["authors"], list)
             authors = AuthorManager()
-            for author_config in self.config["authors"]:
+            for author_config in project_config["authors"]:
                 author = Author(author_config["name"], author_config["email"])
                 if "institutes" in author_config:
                     for institute in author_config["institutes"]:
                         author.add_institute(institute)
                 authors.add_author(author)
             config["author"] = authors.dump(template_name)
-        if self.config.haskey("title"):
-            config["title"] = self.config["title"]
-        if self.config.haskey("date"):
-            config["date"] = self.config["date"]
-        if self.config.haskey("keywords"):
-            assert isinstance(self.config["keywords"], list)
+        if "title" in project_config:
+            config["title"] = project_config["title"]
+        if "date" in project_config:
+            config["date"] = project_config["date"]
+        if "keywords" in project_config:
+            assert isinstance(project_config["keywords"], list)
             keywords = Keywords()
-            for keyword in self.config["keywords"]:
+            for keyword in project_config["keywords"]:
                 keywords.add_keyword(keyword)
             config["keywords"] = keywords.dump()
-        if self.config.haskey("meta"):
-            config["meta"] = self.config["meta"]
+        if "meta" in project_config:
+            config["meta"] = project_config["meta"]
         return config
 
     def _copy_template(self, project_dir, template_name):
@@ -110,8 +120,12 @@ class Mytex:
         for filename in os.listdir(template_path):
             source_path = os.path.join(template_path, filename)
             destination_path = os.path.join(project_dir, filename)
-            self._render_template(source_path, os.path.join(project_dir, filename), self.config)
-            shutil.copy(source_path, destination_path)
+            # if source_path is a directory, copy directory
+            if os.path.isdir(source_path):
+                shutil.copytree(source_path, destination_path)
+            else:
+                # Otherwise, copy file, and render template
+                self._render_template(source_path, destination_path, self._template_config(template_name, project_dir))
     
     @staticmethod
     def _render_template_with_config(template_string, config):
@@ -133,10 +147,10 @@ class Mytex:
         with open(destination_path, "w") as f:
             f.write(Mytex._render_template_with_config(template, context))
 
-    def _update_config(self, project_dir, project_name, template_name):
+    def _update_config(self, project_dir, **updates):
         config = self._read_config(os.path.join(project_dir, ".mytex", "config.yaml"))
-        config["name"] = project_name
-        config["template"] = template_name
+        # merge the updates into config
+        config.update(updates)
         with open(os.path.join(project_dir, ".mytex", "config.yaml"), "w") as f:
             yaml.safe_dump(config, f, indent=4)
 
